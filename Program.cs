@@ -2,7 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using System.Text;
-using OpenAI; // Mandatory for OpenAIClientOptions usage
+using OpenAI; 
+using System.ClientModel; 
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,7 +15,7 @@ var connectionString = builder.Configuration["ConnectionStrings:DefaultConnectio
 builder.Services.AddDbContext<KnowledgeContext>(options =>
     options.UseNpgsql(connectionString));
 
-/ 2. 👇 FIX APPLIED HERE: Create a fully configured OpenAIClient for Groq Redirects
+// 2. Create a fully configured OpenAIClient for Groq Redirects
 var groqKey = builder.Configuration["GroqApiKey"] ?? "YOUR_GROQ_API_KEY";
 var groqOptions = new OpenAIClientOptions { Endpoint = new Uri("https://groq.com") };
 var groqClient = new OpenAIClient(new ApiKeyCredential(groqKey), groqOptions);
@@ -28,7 +29,6 @@ builder.Services.AddKernel().AddOpenAIChatCompletion(
 // 3. Register standard retrieval services for our HTTP endpoint injections
 builder.Services.AddTransient<IChatCompletionService>(sp => 
     sp.GetRequiredService<Kernel>().GetRequiredService<IChatCompletionService>());
-
 
 // Enable global permissive CORS parameters for frontend widget integrations
 builder.Services.AddCors();
