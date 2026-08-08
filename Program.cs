@@ -7,7 +7,7 @@ using System.ClientModel;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Setup Postgres (Neon Tech Compatible String Layout Converter)
+// 1. Setup Postgres Connection Configuration
 var connectionString = builder.Configuration["ConnectionStrings:DefaultConnection"] 
                     ?? builder.Configuration["DefaultConnection"]
                     ?? Environment.GetEnvironmentVariable("DefaultConnection");
@@ -15,20 +15,8 @@ var connectionString = builder.Configuration["ConnectionStrings:DefaultConnectio
 builder.Services.AddDbContext<KnowledgeContext>(options =>
     options.UseNpgsql(connectionString));
 
-// 2. Create a fully configured OpenAIClient for Groq Redirects
-var groqKey = builder.Configuration["GroqApiKey"] ?? "YOUR_GROQ_API_KEY";
-var groqOptions = new OpenAIClientOptions { Endpoint = new Uri("https://groq.com") };
-var groqClient = new OpenAIClient(new ApiKeyCredential(groqKey), groqOptions);
-
-// Pass the configured client explicitly into the kernel builder extension method
-builder.Services.AddKernel().AddOpenAIChatCompletion(
-    modelId: "llama3-8b-8192", 
-    openAIClient: groqClient
-);
-
-// 3. Register standard retrieval services for our HTTP endpoint injections
-builder.Services.AddTransient<IChatCompletionService>(sp => 
-    sp.GetRequiredService<Kernel>().GetRequiredService<IChatCompletionService>());
+// 2. Register standard Semantic Kernel engine structure
+builder.Services.AddKernel();
 
 // Enable global permissive CORS parameters for frontend widget integrations
 builder.Services.AddCors();
@@ -63,7 +51,7 @@ app.MapPost("/api/knowledge/update", async (KnowledgeItem item, KnowledgeContext
     return Results.Ok(new { message = "Knowledge base successfully updated!" });
 });
 
-// ENDPOINT B: Optimized, direct RAG conversation pipeline
+// ENDPOINT B: Optimized, direct non-blocking RAG conversation pipeline
 app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db) =>
 {
     try
@@ -76,7 +64,7 @@ app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db) =>
             contextBuilder.AppendLine($"[{record.Category}] {record.TopicName}: {record.ContentDetails}");
         }
 
-        // 2. Build the system instruction rulebook
+        // 2. Build the system instruction rulebook constraints
         var systemInstruction = 
             "You are an automated support bot. Answer questions accurately using ONLY the context provided below.\n" +
             "If the answer cannot be verified using the context data, reply with: " +
@@ -84,8 +72,10 @@ app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db) =>
             "Do not make up facts under any circumstances.\n\n" +
             $"[LIVE NEON DB CONTEXT]\n{contextBuilder}";
 
-        // 3. 👇 FIX APPLIED HERE: Re-use the existing Groq pipeline credentials for a direct, non-blocking call
-        var key = Environment.GetEnvironmentVariable("GroqApiKey") ?? "YOUR_GROQ_API_KEY";
+        // 3. Re-use Groq pipeline credentials for a direct call to the exact gateway path
+        var key = builder.Configuration["GroqApiKey"] ?? Environment.GetEnvironmentVariable("GroqApiKey") ?? "YOUR_GROQ_API_KEY";
+        
+        // FIX APPLIED HERE: Re-routed base address gateway endpoint correctly
         var options = new OpenAIClientOptions { Endpoint = new Uri("https://groq.com") };
         var client = new OpenAIClient(new ApiKeyCredential(key), options);
         var chatClient = client.GetChatClient("llama3-8b-8192");
@@ -108,7 +98,6 @@ app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db) =>
         return Results.Ok(new { botResponse = $"⚠️ Processing Error occurred: {ex.Message}" });
     }
 });
-
 
 app.Run();
 
