@@ -20,10 +20,11 @@ var groqOptions = new OpenAIClientOptions
     Endpoint = new Uri("https://groq.com")
 };
 
+// 👇 FIX APPLIED HERE: Map 'openAIClientOptions' instead of 'options'
 builder.Services.AddKernel().AddOpenAIChatCompletion(
     modelId: "llama3-8b-8192", 
     apiKey: builder.Configuration["GroqApiKey"] ?? "YOUR_GROQ_API_KEY",
-    options: groqOptions
+    openAIClientOptions: groqOptions
 );
 
 // 3. Register standard retrieval services for our HTTP endpoint injections
