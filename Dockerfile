@@ -1,13 +1,20 @@
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build-env
+# Define build-time arguments with valid default images
+ARG SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:8.0
+ARG RUNTIME_IMAGE=mcr.microsoft.com/dotnet/aspnet:8.0
+
+# Build stage
+FROM ${SDK_IMAGE} AS build-env
 WORKDIR /app
 
 COPY *.csproj ./
 RUN dotnet restore
 
 COPY . ./
-RUN dotnet publish -c Release -o out
+# Suppress experimental warning SKEXP0010
+RUN dotnet publish -c Release -o out /p:NoWarn=SKEXP0010
 
-FROM mcr.microsoft.com/dotnet/aspnet:8.0
+# Runtime stage
+FROM ${RUNTIME_IMAGE}
 WORKDIR /app
 COPY --from=build-env /app/out .
 
