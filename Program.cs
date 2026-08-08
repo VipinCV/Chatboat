@@ -17,7 +17,14 @@ builder.Services.AddOpenAIChatCompletion(
     endpoint: new Uri("https://groq.com") 
 );
 
+builder.Services.AddCors();
+
 var app = builder.Build();
+
+app.UseCors(policy => policy
+    .AllowAnyOrigin()
+    .AllowAnyMethod()
+    .AllowAnyHeader());
 // Simple root landing response to clear Render health-check warnings
 app.MapGet("/", () => Results.Text("🤖 Chatbot API Backend is running live!"));
 
