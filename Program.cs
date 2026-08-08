@@ -52,8 +52,8 @@ app.MapPost("/api/knowledge/update", async (KnowledgeItem item, KnowledgeContext
     return Results.Ok(new { message = "Knowledge base successfully updated!" });
 });
 
-// ENDPOINT B: Production-ready direct JSON payload integration for Groq Cloud
-app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db, IHttpClientFactory httpClientFactory) =>
+// ENDPOINT B: Production-ready direct JSON pipeline integration for Groq Cloud
+app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db) =>
 {
     try
     {
@@ -73,7 +73,7 @@ app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db, IHttpC
             "Do not make up facts under any circumstances.\n\n" +
             $"[LIVE NEON DB CONTEXT]\n{contextBuilder}";
 
-        // 3. 👇 FIX APPLIED HERE: Formulate direct standard JSON to eliminate client routing layers completely
+        // 3. Formulate direct standard JSON to eliminate client routing layers completely
         var key = builder.Configuration["GroqApiKey"] ?? Environment.GetEnvironmentVariable("GroqApiKey") ?? "YOUR_GROQ_API_KEY";
         
         var payload = new
