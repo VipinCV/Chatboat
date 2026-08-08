@@ -107,7 +107,8 @@ app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db) =>
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", key);
 
         // 6. Direct HTTP transaction out to the official Groq cloud gateway location
-        var response = await client.PostAsync("https://groq.com", httpContent);
+       var response = await client.PostAsync("https://api.groq.com/openai/v1/chat/completions", httpContent);
+
         
         if (!response.IsSuccessStatusCode)
         {
