@@ -19,7 +19,8 @@ builder.Services.AddDbContext<KnowledgeContext>(options =>
     endpoint: new Uri("https://groq.com") 
 );*/
 
-builder.Services.AddOpenAIChatCompletion(
+// 2. 👇 FIX APPLIED HERE: Correctly register the Kernel and chain the AI Connector
+builder.Services.AddKernel().AddOpenAIChatCompletion(
     modelId: "llama3-8b-8192", 
     apiKey: builder.Configuration["GroqApiKey"] ?? "YOUR_GROQ_API_KEY",
     httpClient: new HttpClient 
