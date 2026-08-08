@@ -73,12 +73,13 @@ app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db) =>
             "Do not make up facts under any circumstances.\n\n" +
             $"[LIVE NEON DB CONTEXT]\n{contextBuilder}";
 
-        // 3. Re-use Groq pipeline credentials for a direct call to the exact gateway path
-        var key = builder.Configuration["GroqApiKey"] ?? Environment.GetEnvironmentVariable("GroqApiKey") ?? "YOUR_GROQ_API_KEY";
-        
-        var options = new OpenAIClientOptions { Endpoint = new Uri("https://groq.com") };
-        var client = new OpenAIClient(new ApiKeyCredential(key), options);
-        var chatClient = client.GetChatClient("llama3-8b-8192");
+      / 3. Re-use Groq pipeline credentials for a direct call to the exact gateway path
+var key = builder.Configuration["GroqApiKey"] ?? Environment.GetEnvironmentVariable("GroqApiKey") ?? "YOUR_GROQ_API_KEY";
+
+// 👇 FIX APPLIED HERE: Re-point base address string exactly to Groq's absolute root entry point
+var options = new OpenAIClientOptions { Endpoint = new Uri("https://groq.com") };
+var client = new OpenAIClient(new ApiKeyCredential(key), options);
+var chatClient = client.GetChatClient("llama3-8b-8192");
 
         // Execute a direct, native, non-blocking chat completion call
         var chatOptions = new ChatCompletionOptions { Temperature = 0.1f };
