@@ -88,16 +88,16 @@ app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db) =>
         }
         
         // 4. Formulate the official JSON payload structure
-        var payload = new
-        {
-            model = "llama3-8b-8192",
-            messages = new[]
-            {
-                new { role = "system", content = systemInstruction },
-                new { role = "user", content = request.UserQuery }
-            },
-            temperature = 0.1
-        };
+       var payload = new
+{
+    model = "openai/gpt-oss-20b", // 👈 FIX APPLIED HERE: Replaced decommissioned model identifier
+    messages = new[]
+    {
+        new { role = "system", content = systemInstruction },
+        new { role = "user", content = request.UserQuery }
+    },
+    temperature = 0.1
+};
 
         // 5. Serialize data using .NET Web Standard JSON formatting rules
         var jsonContent = JsonSerializer.Serialize(payload);
