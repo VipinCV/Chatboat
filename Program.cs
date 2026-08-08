@@ -1,23 +1,17 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.ChatCompletion;
 using System.Text;
-using OpenAI; 
-using OpenAI.Chat; 
-using System.ClientModel; 
+using System.Text.Json;
+using System.Net.Http.Headers;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Setup Postgres Connection Configuration
+// 1. SETUP POSTGRES CONNECTION CONFIGURATION
 var connectionString = builder.Configuration["ConnectionStrings:DefaultConnection"] 
                     ?? builder.Configuration["DefaultConnection"]
                     ?? Environment.GetEnvironmentVariable("DefaultConnection");
 
 builder.Services.AddDbContext<KnowledgeContext>(options =>
     options.UseNpgsql(connectionString));
-
-// 2. Register standard Semantic Kernel engine structure
-builder.Services.AddKernel();
 
 // Enable global permissive CORS parameters for frontend widget integrations
 builder.Services.AddCors();
@@ -32,28 +26,38 @@ app.UseCors(policy => policy
 // Root endpoint to resolve Render health check alerts
 app.MapGet("/", () => Results.Text("🤖 Chatbot API Backend is running live!"));
 
-// ENDPOINT A: Dynamic Database Updates
+// ==========================================
+// ENDPOINT A: DYNAMIC DATABASE UPDATES
+// ==========================================
 app.MapPost("/api/knowledge/update", async (KnowledgeItem item, KnowledgeContext db) =>
 {
-    var existing = await db.KnowledgeItems
-        .FirstOrDefaultAsync(x => x.Category == item.Category && x.TopicName == item.TopicName);
+    try
+    {
+        var existing = await db.KnowledgeItems
+            .FirstOrDefaultAsync(x => x.Category == item.Category && x.TopicName == item.TopicName);
 
-    if (existing != null)
-    {
-        existing.ContentDetails = item.ContentDetails;
-        existing.LastUpdated = DateTime.UtcNow;
+        if (existing != null)
+        {
+            existing.ContentDetails = item.ContentDetails;
+            existing.LastUpdated = DateTime.UtcNow;
+        }
+        else
+        {
+            db.KnowledgeItems.Add(item);
+        }
+        
+        await db.SaveChangesAsync();
+        return Results.Ok(new { message = "Knowledge base successfully updated!" });
     }
-    else
+    catch (Exception ex)
     {
-        db.KnowledgeItems.Add(item);
+        Console.WriteLine($"[DB UPDATE ERROR]: {ex.Message}");
+        return Results.Problem($"Database sync failure: {ex.Message}");
     }
-    
-    await db.SaveChangesAsync();
-    return Results.Ok(new { message = "Knowledge base successfully updated!" });
 });
 
 // ==========================================
-// ENDPOINT B: PRODUCTION-GRADE GROQ CHAT ENGINE
+// ENDPOINT B: OPTIMIZED DIRECT JSON RAG COUPLING
 // ==========================================
 app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db) =>
 {
@@ -80,7 +84,7 @@ app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db) =>
 
         if (string.IsNullOrWhiteSpace(key) || key == "YOUR_GROQ_API_KEY")
         {
-            return Results.Ok(new { botResponse = "⚠️ Configuration Alert: GroqApiKey is missing from the Render dashboard environment variables." });
+            return Results.Ok(new { botResponse = "⚠️ Configuration Alert: GroqApiKey is missing from the Render environment variables." });
         }
         
         // 4. Formulate the official JSON payload structure
@@ -95,30 +99,31 @@ app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db) =>
             temperature = 0.1
         };
 
+        // 5. Serialize data using .NET Web Standard JSON formatting rules
         var jsonContent = JsonSerializer.Serialize(payload);
         using var httpContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
         using var client = new HttpClient();
         
-        // Apply authorization header rules cleanly
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", key);
 
-        // 5. Send payload directly to the official OpenAI compatibility URL path
+        // 6. Direct HTTP transaction out to the official Groq cloud gateway location
         var response = await client.PostAsync("https://groq.com", httpContent);
         
         if (!response.IsSuccessStatusCode)
         {
             var rawError = await response.Content.ReadAsStringAsync();
-            Console.WriteLine($"[GROQ API CONSOLE FAIL]: Status {response.StatusCode} -> Detail: {rawError}");
-            return Results.Ok(new { botResponse = $"⚠️ Groq API Error response: {response.StatusCode}" });
+            Console.WriteLine($"[GROQ CONSOLE ERROR]: {response.StatusCode} -> {rawError}");
+            return Results.Ok(new { botResponse = $"⚠️ Groq API Connection Error: {response.StatusCode}" });
         }
 
-        // 6. Safely traverse the returning OpenAI-compatible array structure
+        // 7. Extract string safely from OpenAI JSON schema array structure
         var responseBody = await response.Content.ReadAsStringAsync();
         using var jsonDoc = JsonDocument.Parse(responseBody);
         
-        // Navigate through choices array index [0] to extract the text content string
-        var choicesElement = jsonDoc.RootElement.GetProperty("choices");
-        var firstChoice = choicesElement[0]; 
+        var choices = jsonDoc.RootElement.GetProperty("choices");
+        
+        // Target the first elements array item to extract message contents string
+        var firstChoice = choices[0];
         var botMessage = firstChoice.GetProperty("message").GetProperty("content").GetString();
 
         return Results.Ok(new { botResponse = botMessage });
@@ -126,12 +131,9 @@ app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db) =>
     catch (Exception ex)
     {
         Console.WriteLine($"[CRITICAL PIPELINE ENGINE FAILURE]: {ex.Message}");
-        return Results.Ok(new { botResponse = $"⚠️ Internal engine error: {ex.Message}" });
+        return Results.Ok(new { botResponse = $"⚠️ Internal processing engine runtime anomaly: {ex.Message}" });
     }
 });
-
-
-
 
 app.Run();
 
