@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Microsoft AI Orchestration Core Package -->
+    <PackageReference Include="Microsoft.SemanticKernel" Version="1.38.0" />
+    
+    <!-- OpenAI Connector (Used to route to Groq's Free Cloud API Endpoint) -->
+    <PackageReference Include="Microsoft.SemanticKernel.Connectors.OpenAI" Version="1.38.0" />
+    
+    <!-- PostgreSQL Database Driver and Entity Framework Core Support -->
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.11" />
+  </ItemGroup>
+
+</Project>
