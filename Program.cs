@@ -63,8 +63,8 @@ app.MapPost("/api/knowledge/update", async (KnowledgeItem item, KnowledgeContext
     return Results.Ok(new { message = "Knowledge base successfully updated!" });
 });
 
-// ENDPOINT B: Dynamic RAG Conversational Engine
-app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db, Kernel kernel) =>
+// ENDPOINT B: Optimized, direct RAG conversation pipeline
+app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db) =>
 {
     try
     {
@@ -76,7 +76,7 @@ app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db, Kernel
             contextBuilder.AppendLine($"[{record.Category}] {record.TopicName}: {record.ContentDetails}");
         }
 
-        // 2. Build explicit system instruction constraints
+        // 2. Build the system instruction rulebook
         var systemInstruction = 
             "You are an automated support bot. Answer questions accurately using ONLY the context provided below.\n" +
             "If the answer cannot be verified using the context data, reply with: " +
@@ -84,20 +84,31 @@ app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db, Kernel
             "Do not make up facts under any circumstances.\n\n" +
             $"[LIVE NEON DB CONTEXT]\n{contextBuilder}";
 
-        // 3. Create a clean prompt execution block that passes the query to Groq
-        var executionPrompt = $"{systemInstruction}\n\nUser Question: {request.UserQuery}\nAssistant Answer:";
-        
-        // Use InvokePromptAsync directly to pass the query string safely without thread locking
-        var response = await kernel.InvokePromptAsync(executionPrompt);
-        
-        return Results.Ok(new { botResponse = response.ToString() });
+        // 3. 👇 FIX APPLIED HERE: Re-use the existing Groq pipeline credentials for a direct, non-blocking call
+        var key = Environment.GetEnvironmentVariable("GroqApiKey") ?? "YOUR_GROQ_API_KEY";
+        var options = new OpenAIClientOptions { Endpoint = new Uri("https://groq.com") };
+        var client = new OpenAIClient(new ApiKeyCredential(key), options);
+        var chatClient = client.GetChatClient("llama3-8b-8192");
+
+        // Execute a direct, native, non-blocking chat completion call
+        var chatOptions = new ChatCompletionOptions { Temperature = 0.1f };
+        var response = await chatClient.CompleteChatAsync(
+            new ChatMessage[] {
+                ChatMessage.CreateSystemMessage(systemInstruction),
+                ChatMessage.CreateUserMessage(request.UserQuery)
+            }, 
+            chatOptions
+        );
+
+        return Results.Ok(new { botResponse = response.Value.Content[0].Text });
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[CRITICAL AI LOG CRASH]: {ex.Message}");
+        Console.WriteLine($"[CRITICAL DIRECT CHAT ERROR]: {ex.Message}");
         return Results.Ok(new { botResponse = $"⚠️ Processing Error occurred: {ex.Message}" });
     }
 });
+
 
 app.Run();
 
