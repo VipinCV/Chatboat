@@ -18,7 +18,10 @@ builder.Services.AddOpenAIChatCompletion(
 );
 
 var app = builder.Build();
-app.UseHttpsRedirection();
+// Simple root landing response to clear Render health-check warnings
+app.MapGet("/", () => Results.Text("🤖 Chatbot API Backend is running live!"));
+
+//app.UseHttpsRedirection();
 
 // ENDPOINT A: Update or add details dynamically to the database
 app.MapPost("/api/knowledge/update", async (KnowledgeItem item, KnowledgeContext db) =>
