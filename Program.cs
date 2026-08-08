@@ -52,8 +52,8 @@ app.MapPost("/api/knowledge/update", async (KnowledgeItem item, KnowledgeContext
     return Results.Ok(new { message = "Knowledge base successfully updated!" });
 });
 
-// ENDPOINT B: Fully verified, custom-routed RAG conversation pipeline
-app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db) =>
+// ENDPOINT B: Production-ready direct JSON payload integration for Groq Cloud
+app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db, IHttpClientFactory httpClientFactory) =>
 {
     try
     {
@@ -73,29 +73,44 @@ app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db) =>
             "Do not make up facts under any circumstances.\n\n" +
             $"[LIVE NEON DB CONTEXT]\n{contextBuilder}";
 
-        // 3. FIX APPLIED HERE: Initialize the client using a clean pipeline redirect interceptor
+        // 3. 👇 FIX APPLIED HERE: Formulate direct standard JSON to eliminate client routing layers completely
         var key = builder.Configuration["GroqApiKey"] ?? Environment.GetEnvironmentVariable("GroqApiKey") ?? "YOUR_GROQ_API_KEY";
         
-        var options = new OpenAIClientOptions();
-        // Force the absolute destination path using an explicit internal pipeline override
-        typeof(OpenAIClientOptions)
-            .GetProperty("Endpoint", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
-            ?.SetValue(options, new Uri("https://groq.com"));
+        var payload = new
+        {
+            model = "llama3-8b-8192",
+            messages = new[]
+            {
+                new { role = "system", content = systemInstruction },
+                new { role = "user", content = request.UserQuery }
+            },
+            temperature = 0.1
+        };
 
-        var client = new OpenAIClient(new ApiKeyCredential(key), options);
-        var chatClient = client.GetChatClient("llama3-8b-8192");
+        // Serialize data and configure the network post client manually
+        var jsonContent = System.Text.Json.JsonSerializer.Serialize(payload);
+        var httpContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
-        // Execute a direct, native, non-blocking chat completion call
-        var chatOptions = new ChatCompletionOptions { Temperature = 0.1f };
-        var response = await chatClient.CompleteChatAsync(
-            new ChatMessage[] {
-                ChatMessage.CreateSystemMessage(systemInstruction),
-                ChatMessage.CreateUserMessage(request.UserQuery)
-            }, 
-            chatOptions
-        );
+        using var client = new HttpClient();
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", key);
 
-        return Results.Ok(new { botResponse = response.Value.Content[0].Text });
+        // Send direct, un-altered request straight to the official compatibility URL gateway path
+        var response = await client.PostAsync("https://groq.com", httpContent);
+        
+        if (!response.IsSuccessStatusCode)
+        {
+            var rawError = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"[GROQ GATEWAY ERROR CODE]: {response.StatusCode} -> {rawError}");
+            return Results.Ok(new { botResponse = $"⚠️ Groq API Error response: {response.StatusCode}" });
+        }
+
+        // Parse out the generated text cleanly from the returning stream package
+        var responseBody = await response.Content.ReadAsStringAsync();
+        using var jsonDoc = System.Text.Json.JsonDocument.Parse(responseBody);
+        var choices = jsonDoc.RootElement.GetProperty("choices");
+        var botMessage = choices[0].GetProperty("message").GetProperty("content").GetString();
+
+        return Results.Ok(new { botResponse = botMessage });
     }
     catch (Exception ex)
     {
@@ -103,6 +118,7 @@ app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db) =>
         return Results.Ok(new { botResponse = $"⚠️ Processing Error occurred: {ex.Message}" });
     }
 });
+
 
 
 app.Run();
