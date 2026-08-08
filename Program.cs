@@ -13,10 +13,19 @@ builder.Services.AddDbContext<KnowledgeContext>(options =>
     options.UseNpgsql(connectionString));
 
 // 2. Connect to Groq's Free Cloud API
-builder.Services.AddOpenAIChatCompletion(
+/*builder.Services.AddOpenAIChatCompletion(
     modelId: "llama3-8b-8192", 
     apiKey: builder.Configuration["GroqApiKey"] ?? "YOUR_GROQ_API_KEY", 
     endpoint: new Uri("https://groq.com") 
+);*/
+
+builder.Services.AddOpenAIChatCompletion(
+    modelId: "llama3-8b-8192", 
+    apiKey: builder.Configuration["GroqApiKey"] ?? "YOUR_GROQ_API_KEY",
+    httpClient: new HttpClient 
+    { 
+        BaseAddress = new Uri("https://groq.com") 
+    }
 );
 
 builder.Services.AddCors();
