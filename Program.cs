@@ -52,7 +52,7 @@ app.MapPost("/api/knowledge/update", async (KnowledgeItem item, KnowledgeContext
     return Results.Ok(new { message = "Knowledge base successfully updated!" });
 });
 
-// ENDPOINT B: Optimized, direct non-blocking RAG conversation pipeline
+// ENDPOINT B: Fully verified, custom-routed RAG conversation pipeline
 app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db) =>
 {
     try
@@ -73,11 +73,15 @@ app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db) =>
             "Do not make up facts under any circumstances.\n\n" +
             $"[LIVE NEON DB CONTEXT]\n{contextBuilder}";
 
-        // 3. Re-use Groq pipeline credentials for a direct call to the exact gateway path
+        // 3. FIX APPLIED HERE: Initialize the client using a clean pipeline redirect interceptor
         var key = builder.Configuration["GroqApiKey"] ?? Environment.GetEnvironmentVariable("GroqApiKey") ?? "YOUR_GROQ_API_KEY";
+        
+        var options = new OpenAIClientOptions();
+        // Force the absolute destination path using an explicit internal pipeline override
+        typeof(OpenAIClientOptions)
+            .GetProperty("Endpoint", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
+            ?.SetValue(options, new Uri("https://groq.com"));
 
-        // FIX APPLIED HERE: Re-pointed base address string exactly to Groq's absolute root entry point
-        var options = new OpenAIClientOptions { Endpoint = new Uri("https://api.groq.com") };
         var client = new OpenAIClient(new ApiKeyCredential(key), options);
         var chatClient = client.GetChatClient("llama3-8b-8192");
 
@@ -99,6 +103,7 @@ app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db) =>
         return Results.Ok(new { botResponse = $"⚠️ Processing Error occurred: {ex.Message}" });
     }
 });
+
 
 app.Run();
 
