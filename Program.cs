@@ -3,6 +3,7 @@ using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using System.Text;
 using OpenAI; 
+using OpenAI.Chat; // 👈 FIX APPLIED HERE: Exposes ChatMessage and ChatCompletionOptions namespaces
 using System.ClientModel; 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -75,7 +76,6 @@ app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db) =>
         // 3. Re-use Groq pipeline credentials for a direct call to the exact gateway path
         var key = builder.Configuration["GroqApiKey"] ?? Environment.GetEnvironmentVariable("GroqApiKey") ?? "YOUR_GROQ_API_KEY";
         
-        // FIX APPLIED HERE: Re-routed base address gateway endpoint correctly
         var options = new OpenAIClientOptions { Endpoint = new Uri("https://groq.com") };
         var client = new OpenAIClient(new ApiKeyCredential(key), options);
         var chatClient = client.GetChatClient("llama3-8b-8192");
