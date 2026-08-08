@@ -12,22 +12,21 @@ var connectionString = builder.Configuration["ConnectionStrings:DefaultConnectio
 builder.Services.AddDbContext<KnowledgeContext>(options =>
     options.UseNpgsql(connectionString));
 
-// 2. Connect to Groq's Free Cloud API
-/*builder.Services.AddOpenAIChatCompletion(
-    modelId: "llama3-8b-8192", 
-    apiKey: builder.Configuration["GroqApiKey"] ?? "YOUR_GROQ_API_KEY", 
-    endpoint: new Uri("https://groq.com") 
-);*/
+// 2. 👇 FIX APPLIED HERE: Initialize standard OpenAIClientOptions to point to Groq's exact gateway base
+var groqOptions = new OpenAIClientOptions
+{
+    Endpoint = new Uri("https://groq.com")
+};
 
-// 2. 👇 FIX APPLIED HERE: Correctly register the Kernel and chain the AI Connector
 builder.Services.AddKernel().AddOpenAIChatCompletion(
     modelId: "llama3-8b-8192", 
     apiKey: builder.Configuration["GroqApiKey"] ?? "YOUR_GROQ_API_KEY",
-    httpClient: new HttpClient 
-    { 
-        BaseAddress = new Uri("https://groq.com") 
-    }
+    options: groqOptions
 );
+
+// 3. Register the Chat Completion Service directly for your endpoints to use
+builder.Services.AddTransient<IChatCompletionService>(sp => 
+    sp.GetRequiredService<Kernel>().GetRequiredService<IChatCompletionService>());
 
 builder.Services.AddCors();
 
