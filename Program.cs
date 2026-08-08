@@ -64,10 +64,11 @@ app.MapPost("/api/knowledge/update", async (KnowledgeItem item, KnowledgeContext
 });
 
 // ENDPOINT B: Dynamic RAG Conversational Engine
-app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db, IChatCompletionService chatService) =>
+app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db, Kernel kernel) =>
 {
     try
     {
+        // 1. Fetch live records from Neon PostgreSQL
         var currentRecords = await db.KnowledgeItems.ToListAsync();
         var contextBuilder = new StringBuilder();
         foreach (var record in currentRecords)
@@ -75,6 +76,7 @@ app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db, IChatC
             contextBuilder.AppendLine($"[{record.Category}] {record.TopicName}: {record.ContentDetails}");
         }
 
+        // 2. Build explicit system instruction constraints
         var systemInstruction = 
             "You are an automated support bot. Answer questions accurately using ONLY the context provided below.\n" +
             "If the answer cannot be verified using the context data, reply with: " +
@@ -82,16 +84,18 @@ app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db, IChatC
             "Do not make up facts under any circumstances.\n\n" +
             $"[LIVE NEON DB CONTEXT]\n{contextBuilder}";
 
-        var history = new ChatHistory(systemInstruction);
-        history.AddUserMessage(request.UserQuery);
-
-        var response = await chatService.GetChatMessageContentAsync(history);
-        return Results.Ok(new { botResponse = response.Content });
+        // 3. Create a clean prompt execution block that passes the query to Groq
+        var executionPrompt = $"{systemInstruction}\n\nUser Question: {request.UserQuery}\nAssistant Answer:";
+        
+        // Use InvokePromptAsync directly to pass the query string safely without thread locking
+        var response = await kernel.InvokePromptAsync(executionPrompt);
+        
+        return Results.Ok(new { botResponse = response.ToString() });
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[AI LOG CRASH ALERT]: {ex.Message}");
-        return Results.Problem($"Chatbot engine processing failed: {ex.Message}");
+        Console.WriteLine($"[CRITICAL AI LOG CRASH]: {ex.Message}");
+        return Results.Ok(new { botResponse = $"⚠️ Processing Error occurred: {ex.Message}" });
     }
 });
 
