@@ -52,7 +52,9 @@ app.MapPost("/api/knowledge/update", async (KnowledgeItem item, KnowledgeContext
     return Results.Ok(new { message = "Knowledge base successfully updated!" });
 });
 
-// ENDPOINT B: Production-ready direct JSON pipeline integration for Groq Cloud
+// ==========================================
+// ENDPOINT B: PRODUCTION-GRADE GROQ CHAT ENGINE
+// ==========================================
 app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db) =>
 {
     try
@@ -73,9 +75,15 @@ app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db) =>
             "Do not make up facts under any circumstances.\n\n" +
             $"[LIVE NEON DB CONTEXT]\n{contextBuilder}";
 
-        // 3. Formulate direct standard JSON to eliminate client routing layers completely
-        var key = builder.Configuration["GroqApiKey"] ?? Environment.GetEnvironmentVariable("GroqApiKey") ?? "YOUR_GROQ_API_KEY";
+        // 3. Extract your Groq API token key safely
+        var key = builder.Configuration["GroqApiKey"] ?? Environment.GetEnvironmentVariable("GroqApiKey");
+
+        if (string.IsNullOrWhiteSpace(key) || key == "YOUR_GROQ_API_KEY")
+        {
+            return Results.Ok(new { botResponse = "⚠️ Configuration Alert: GroqApiKey is missing from the Render dashboard environment variables." });
+        }
         
+        // 4. Formulate the official JSON payload structure
         var payload = new
         {
             model = "llama3-8b-8192",
@@ -87,37 +95,41 @@ app.MapPost("/api/chat", async (ChatRequest request, KnowledgeContext db) =>
             temperature = 0.1
         };
 
-        // Serialize data and configure the network post client manually
-        var jsonContent = System.Text.Json.JsonSerializer.Serialize(payload);
-        var httpContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
-
+        var jsonContent = JsonSerializer.Serialize(payload);
+        using var httpContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
         using var client = new HttpClient();
-        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", key);
+        
+        // Apply authorization header rules cleanly
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", key);
 
-        // Send direct, un-altered request straight to the official compatibility URL gateway path
+        // 5. Send payload directly to the official OpenAI compatibility URL path
         var response = await client.PostAsync("https://groq.com", httpContent);
         
         if (!response.IsSuccessStatusCode)
         {
             var rawError = await response.Content.ReadAsStringAsync();
-            Console.WriteLine($"[GROQ GATEWAY ERROR CODE]: {response.StatusCode} -> {rawError}");
+            Console.WriteLine($"[GROQ API CONSOLE FAIL]: Status {response.StatusCode} -> Detail: {rawError}");
             return Results.Ok(new { botResponse = $"⚠️ Groq API Error response: {response.StatusCode}" });
         }
 
-        // Parse out the generated text cleanly from the returning stream package
+        // 6. Safely traverse the returning OpenAI-compatible array structure
         var responseBody = await response.Content.ReadAsStringAsync();
-        using var jsonDoc = System.Text.Json.JsonDocument.Parse(responseBody);
-        var choices = jsonDoc.RootElement.GetProperty("choices");
-        var botMessage = choices[0].GetProperty("message").GetProperty("content").GetString();
+        using var jsonDoc = JsonDocument.Parse(responseBody);
+        
+        // Navigate through choices array index [0] to extract the text content string
+        var choicesElement = jsonDoc.RootElement.GetProperty("choices");
+        var firstChoice = choicesElement[0]; 
+        var botMessage = firstChoice.GetProperty("message").GetProperty("content").GetString();
 
         return Results.Ok(new { botResponse = botMessage });
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"[CRITICAL DIRECT CHAT ERROR]: {ex.Message}");
-        return Results.Ok(new { botResponse = $"⚠️ Processing Error occurred: {ex.Message}" });
+        Console.WriteLine($"[CRITICAL PIPELINE ENGINE FAILURE]: {ex.Message}");
+        return Results.Ok(new { botResponse = $"⚠️ Internal engine error: {ex.Message}" });
     }
 });
+
 
 
 
