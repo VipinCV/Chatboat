@@ -14,22 +14,21 @@ var connectionString = builder.Configuration["ConnectionStrings:DefaultConnectio
 builder.Services.AddDbContext<KnowledgeContext>(options =>
     options.UseNpgsql(connectionString));
 
-// 2. Setup Groq Proxy Redirects Using Native Client Options Extensions
-var groqOptions = new OpenAIClientOptions
-{
-    Endpoint = new Uri("https://groq.com")
-};
+/ 2. 👇 FIX APPLIED HERE: Create a fully configured OpenAIClient for Groq Redirects
+var groqKey = builder.Configuration["GroqApiKey"] ?? "YOUR_GROQ_API_KEY";
+var groqOptions = new OpenAIClientOptions { Endpoint = new Uri("https://groq.com") };
+var groqClient = new OpenAIClient(new ApiKeyCredential(groqKey), groqOptions);
 
-// 👇 FIX APPLIED HERE: Map 'openAIClientOptions' instead of 'options'
+// Pass the configured client explicitly into the kernel builder extension method
 builder.Services.AddKernel().AddOpenAIChatCompletion(
     modelId: "llama3-8b-8192", 
-    apiKey: builder.Configuration["GroqApiKey"] ?? "YOUR_GROQ_API_KEY",
-    openAIClientOptions: groqOptions
+    openAIClient: groqClient
 );
 
 // 3. Register standard retrieval services for our HTTP endpoint injections
 builder.Services.AddTransient<IChatCompletionService>(sp => 
     sp.GetRequiredService<Kernel>().GetRequiredService<IChatCompletionService>());
+
 
 // Enable global permissive CORS parameters for frontend widget integrations
 builder.Services.AddCors();
